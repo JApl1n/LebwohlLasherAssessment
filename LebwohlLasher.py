@@ -44,7 +44,7 @@ def initdat(nmax):
     arr = np.random.random_sample((nmax,nmax))*2.0*np.pi
     return arr
 #=======================================================================
-def plotdat(arr,pflag,nmax):
+def plotdat(arr,pflag,nmax,figN):
     """
     Arguments:
 	  arr (float(nmax,nmax)) = array that contains lattice data;
@@ -90,7 +90,8 @@ def plotdat(arr,pflag,nmax):
     q = ax.quiver(x, y, u, v, cols,norm=norm, **quiveropts)
     ax.set_aspect('equal')
     plt.show()
-    #plt.savefig("outputfig.png")
+    plt.savefig("outputfig"+str(figN)+".png")
+
 #=======================================================================
 def savedat(arr,nsteps,Ts,runtime,ratio,energy,order,nmax):
     """
@@ -268,10 +269,12 @@ def main(program, nsteps, nmax, temp, pflag):
     Returns:
       NULL
     """
+    figN = int(0)
     # Create and initialise lattice
     lattice = initdat(nmax)
     # Plot initial frame of lattice
-    plotdat(lattice,pflag,nmax)
+    #plotdat(lattice,pflag,nmax,figN)
+    #figN += 1
     # Create arrays to store energy, acceptance ratio and order parameter
     energy = np.zeros(nsteps+1,dtype=np.dtype)
     ratio = np.zeros(nsteps+1,dtype=np.dtype)
@@ -293,8 +296,10 @@ def main(program, nsteps, nmax, temp, pflag):
     # Final outputs
     print("{}: Size: {:d}, Steps: {:d}, T*: {:5.3f}: Order: {:5.3f}, Time: {:8.6f} s".format(program, nmax,nsteps,temp,order[nsteps-1],runtime))
     # Plot final frame of lattice and generate output file
-    #savedat(lattice,nsteps,temp,runtime,ratio,energy,order,nmax)
-    plotdat(lattice,pflag,nmax)
+    savedat(lattice,nsteps,temp,runtime,ratio,energy,order,nmax)
+    #plotdat(lattice,pflag,nmax,figN)
+
+
 #=======================================================================
 # Main part of program, getting command line arguments and calling
 # main simulation function.
