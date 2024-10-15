@@ -19,6 +19,9 @@ for file in *.out; do
     mv -- "$file" "${file%.out}.txt"
 done
 
+echo "Ignore first warning message. Here are the times of the run, they have also been collated in summary.txt in outputs."
+
 # find average time for each iterayion
 cd ../programs
 python ./timer.py
+

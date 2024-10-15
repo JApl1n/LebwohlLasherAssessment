@@ -5,7 +5,7 @@
 #SBATCH --partition=teach_cpu
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=1
+#SBATCH --cpus-per-task=2
 #SBATCH --time=0:0:10
 #SBATCH --mem-per-cpu=100M 
 #SBATCH --array=100-101
@@ -23,7 +23,7 @@ cd "${SLURM_SUBMIT_DIR}"
 #printf "\n\n"
 
 # Submit
-python ./programs/LebwohlLasher.py 0 20 1 1
+python ./programs/originalLebwohlLasher.py 5 50 1 1
 
 # Output the end time
 #printf "\n\n"
