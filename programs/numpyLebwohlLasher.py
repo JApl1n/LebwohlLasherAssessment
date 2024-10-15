@@ -164,41 +164,15 @@ def one_energy(arr,ix,iy,nmax):
     en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
     return en
 #=======================================================================
-def all_energy(arr,nmax):
+def get_energy_array(arr):
     """
     Arguments:
-	  arr (float(nmax,nmax)) = array that contains lattice data;
-      nmax (int) = side length of square lattice.
+          arr (float(nmax,nmax)) = array that contains lattice data;
     Description:
-      Function to compute the energy of the entire lattice. Output
-      is in reduced units (U/epsilon).
-	Returns:
-	  enall (float) = reduced energy of lattice.
+      Function to compute the energy of the entire lattice.
+    Returns:
+          energyArray (float(nmax,nmax)) = every lattice point's energy.
     """
-
-    #copy = np.empty_like(arr)
-    #print(arr)
-    #print("Shifted down:")
-    #copy[1:][:] = arr[:-1][:]
-    #copy[0][:] = arr[-1][:]
-    #print(copy)
-    #print("Shifted right")
-    #copy = np.empty_like(arr)
-    #copy[:,1:] = arr[:,:-1]
-    #copy[:,0] = arr[:,-1]
-    #print(copy)
-    #print("Shifted up")
-    #copy = np.empty_like(arr)
-    #copy[:-1][:] = arr[1:][:]
-    #copy[-1][:] = arr[0][:]
-    #print(copy)
-    #print("Shifted left")
-    #copy = np.empty_like(arr)
-    #copy[:,:-1] = arr[:,1:]
-    #copy[:,-1] = arr[:,0]
-    #print(copy)
-
-    #print("")
 
     energyArr = np.full_like(arr,0)
     ang = np.empty_like(arr)
@@ -223,7 +197,24 @@ def all_energy(arr,nmax):
     shift[:-1][:] = arr[1:][:]
     shift[-1][:] = arr[0][:]
     ang = arr-shift
-    energyArr = energyArr + 0.5*(1.0 - 3.0*np.cos(ang)**2)    
+    energyArr = energyArr + 0.5*(1.0 - 3.0*np.cos(ang)**2)
+
+    return(energyArr)
+
+#=======================================================================
+def all_energy(arr,nmax):
+    """
+    Arguments:
+	  arr (float(nmax,nmax)) = array that contains lattice data;
+      nmax (int) = side length of square lattice.
+    Description:
+      Function to compute the energy of the entire lattice. Output
+      is in reduced units (U/epsilon).
+	Returns:
+	  enall (float) = reduced energy of lattice.
+    """
+
+    energyArr = get_energy_array(arr)    
     
     eSum  = np.sum(energyArr)
 
@@ -277,11 +268,13 @@ def MC_step(arr,Ts,nmax):
 	Returns:
 	  accept/(nmax**2) (float) = acceptance ratio for current MCS.
     """
+    #scale = 0.1+Ts
 
-    new = np.copy(arr)
-    #print(new)
-    #new = new + new[[1::]]
+    #ang = np.random.normal(scale=scale, size=(nmax,nmax))
 
+    #en0 = get_energy_array(arr)
+    #arr = arr + ang
+    #en1 = get_energy_array(arr)
 
     #
     # Pre-compute some random numbers.  This is faster than
