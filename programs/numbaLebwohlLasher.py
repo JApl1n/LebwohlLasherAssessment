@@ -23,11 +23,13 @@ SH 16-Oct-23
 """
 
 import sys
+from numba import jit ,prange
 import time
 import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+@jit(nopython=True, parallel=True)
 
 #=======================================================================
 def initdat(nmax):
