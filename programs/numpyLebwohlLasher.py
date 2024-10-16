@@ -202,27 +202,22 @@ def get_energy_array(arr):
     return(energyArr)
 
 #=======================================================================
-def all_energy(arr,nmax):
+def all_energy(arr):
     """
     Arguments:
 	  arr (float(nmax,nmax)) = array that contains lattice data;
-      nmax (int) = side length of square lattice.
     Description:
       Function to compute the energy of the entire lattice. Output
       is in reduced units (U/epsilon).
 	Returns:
-	  enall (float) = reduced energy of lattice.
+	  eSum (float) = reduced energy of lattice.
     """
 
     energyArr = get_energy_array(arr)    
     
     eSum  = np.sum(energyArr)
 
-    enall = 0.0
-    for i in range(nmax):
-        for j in range(nmax):
-            enall += one_energy(arr,i,j,nmax)
-    return enall, eSum
+    return eSum
 #=======================================================================
 def get_order(arr,nmax):
     """
@@ -236,6 +231,29 @@ def get_order(arr,nmax):
 	Returns:
 	  max(eigenvalues(Qab)) (float) = order parameter for lattice.
     """
+    
+    Qab = np.zeros((3,3))
+    delta = np.eye(3,3)
+
+    sub = (nmax*nmax)
+
+    cosSq = np.cos(arr)
+    sinSq = np.sin(arr)
+    cosSin = np.sum(3*sinSq*cosSq)
+    cosSq = np.sum(3*np.power(cosSq,2)) - sub
+    sinSq = np.sum(3*np.power(sinSq,2)) - sub
+
+    Qab[0,0] = cosSq
+    Qab[0,1] = cosSin
+    Qab[1,0] = cosSin
+    Qab[1,1] = sinSq
+    Qab[2,2] = -sub
+
+    Qab = Qab/(2*sub)
+    eigenvaluesNew,eigenvectorsNew = np.linalg.eig(Qab)
+    QabNew = np.copy(Qab)
+
+
     Qab = np.zeros((3,3))
     delta = np.eye(3,3)
     #
@@ -243,6 +261,7 @@ def get_order(arr,nmax):
     # put it in a (3,i,j) array.
     #
     lab = np.vstack((np.cos(arr),np.sin(arr),np.zeros_like(arr))).reshape(3,nmax,nmax)
+     
     for a in range(3):
         for b in range(3):
             for i in range(nmax):
@@ -250,6 +269,13 @@ def get_order(arr,nmax):
                     Qab[a,b] += 3*lab[a,i,j]*lab[b,i,j] - delta[a,b]
     Qab = Qab/(2*nmax*nmax)
     eigenvalues,eigenvectors = np.linalg.eig(Qab)
+
+    print("Old method eigenvalues:")
+    print(Qab)
+    print("New method eigenvalues:")
+    print(QabNew)
+    print("Done")
+
     return eigenvalues.max()
 #=======================================================================
 def MC_step(arr,Ts,nmax):
@@ -268,13 +294,27 @@ def MC_step(arr,Ts,nmax):
 	Returns:
 	  accept/(nmax**2) (float) = acceptance ratio for current MCS.
     """
-    #scale = 0.1+Ts
+    scale = 0.1+Ts
 
     #ang = np.random.normal(scale=scale, size=(nmax,nmax))
+    #comp = np.empty(shape=(nmax,nmax))
 
     #en0 = get_energy_array(arr)
     #arr = arr + ang
     #en1 = get_energy_array(arr)
+
+
+    #print("en0:")
+    #print(en0)
+    #print("en1:")
+    #print(en1)
+    #print("en0<=en1?")
+    #comp = np.where(en0 <= en1, 1, np.exp(-(en1-en0)/Ts))
+    #print(comp)
+    #print("boltzmann step")
+    #print(np.where(np.logical_and((comp<1), (comp>0)),1,-1))
+    
+    
 
     #
     # Pre-compute some random numbers.  This is faster than
@@ -324,7 +364,7 @@ def main(program, nsteps, nmax, temp, pflag):
     figN = int(0)
     # Create and initialise lattice
     lattice = initdat(nmax)
-    energyVal, energyArr = all_energy(lattice,nmax)
+    eSum = all_energy(lattice)
     # Plot initial frame of lattice
     plotdat(lattice,pflag,nmax,figN)
     figN += 1
@@ -333,7 +373,7 @@ def main(program, nsteps, nmax, temp, pflag):
     ratio = np.zeros(nsteps+1,dtype=np.dtype)
     order = np.zeros(nsteps+1,dtype=np.dtype)
     # Set initial values in arrays
-    energy[0] = np.sum(energyArr)
+    energy[0] = eSum
     ratio[0] = 0.5 # ideal value
     order[0] = get_order(lattice,nmax)
 
@@ -341,10 +381,7 @@ def main(program, nsteps, nmax, temp, pflag):
     initial = time.time()
     for it in range(1,nsteps+1):
         ratio[it] = MC_step(lattice,temp,nmax)
-        energyVal, energySum = all_energy(lattice,nmax)
-        print(energyVal)
-        print(energySum)
-        energy[it] = np.sum(energyArr)
+        energy[it] = all_energy(lattice)
         order[it] = get_order(lattice,nmax)
     final = time.time()
     runtime = final-initial
