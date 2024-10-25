@@ -24,7 +24,7 @@ progName = str(split[0][11:-1])
 L = str(split[2][:-1])
 steps = str(split[4][:-1])
 
-output = str("Average time taken for "+progName+" to complete "+steps+" steps on a grid of size "+L+"x"+L+" for "+str(len(times))+" iterations was "+str(times.mean())+" seconds.")
+output = str("Average time taken for "+progName+" to complete "+steps+" steps on a grid of size "+L+"x"+L+" for "+str(len(times))+" iterations was "+str(times.mean())+" seconds. \n")
 print(output)
 f = open("summary.txt", "a")
 f.write(output)

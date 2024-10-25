@@ -154,72 +154,32 @@ def one_energy(arr,ix,iy,nmax):
 # Add together the 4 neighbour contributions
 # to the energy
 #
-    mid = arr[ix,iy]
-
-    ang = mid-arr[ixp,iy]
-    en += (0.5 - 1.5*np.cos(ang)**2)
-    ang = mid-arr[ixm,iy]
-    en += (0.5 - 1.5*np.cos(ang)**2)
-    ang = mid-arr[ix,iyp]
-    en += (0.5 - 1.5*np.cos(ang)**2)
-    ang = mid-arr[ix,iym]
-    en += (0.5 - 1.5*np.cos(ang)**2)
+    ang = arr[ix,iy]-arr[ixp,iy]
+    en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
+    ang = arr[ix,iy]-arr[ixm,iy]
+    en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
+    ang = arr[ix,iy]-arr[ix,iyp]
+    en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
+    ang = arr[ix,iy]-arr[ix,iym]
+    en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
     return en
 #=======================================================================
-def get_energy_array(arr):
-    """
-    Arguments:
-          arr (float(nmax,nmax)) = array that contains lattice data;
-    Description:
-      Function to compute the energy of the entire lattice.
-    Returns:
-          energyArray (float(nmax,nmax)) = every lattice point's energy.
-    """
-
-    energyArr = np.full_like(arr,0)
-    ang = np.empty_like(arr)
-    shift = np.empty_like(arr)
-
-    #left compare
-    shift[:,:-1] = arr[:,1:]
-    shift[:,-1] = arr[:,0]
-    ang = arr-shift
-    energyArr = energyArr + 0.5*(1.0 - 3.0*np.cos(ang)**2)
-    #right compare
-    shift[:,1:] = arr[:,:-1]
-    shift[:,0] = arr[:,-1]
-    ang = arr-shift
-    energyArr = energyArr + 0.5*(1.0 - 3.0*np.cos(ang)**2)
-    #down compare
-    shift[1:][:] = arr[:-1][:]
-    shift[0][:] = arr[-1][:]
-    ang = arr-shift
-    energyArr = energyArr + 0.5*(1.0 - 3.0*np.cos(ang)**2)
-    #up compare
-    shift[:-1][:] = arr[1:][:]
-    shift[-1][:] = arr[0][:]
-    ang = arr-shift
-    energyArr = energyArr + 0.5*(1.0 - 3.0*np.cos(ang)**2)
-
-    return(energyArr)
-
-#=======================================================================
-def all_energy(arr):
+def all_energy(arr,nmax):
     """
     Arguments:
 	  arr (float(nmax,nmax)) = array that contains lattice data;
+      nmax (int) = side length of square lattice.
     Description:
       Function to compute the energy of the entire lattice. Output
       is in reduced units (U/epsilon).
 	Returns:
-	  eSum (float) = reduced energy of lattice.
+	  enall (float) = reduced energy of lattice.
     """
-
-    energyArr = get_energy_array(arr)    
-    
-    eSum  = np.sum(energyArr)
-
-    return eSum
+    enall = 0.0
+    for i in range(nmax):
+        for j in range(nmax):
+            enall += one_energy(arr,i,j,nmax)
+    return enall
 #=======================================================================
 def get_order(arr,nmax):
     """
@@ -233,27 +193,20 @@ def get_order(arr,nmax):
 	Returns:
 	  max(eigenvalues(Qab)) (float) = order parameter for lattice.
     """
-    
     Qab = np.zeros((3,3))
     delta = np.eye(3,3)
-
-    sub = (nmax*nmax)
-
-    cosSq = np.cos(arr)
-    sinSq = np.sin(arr)
-    cosSin = np.sum(3*sinSq*cosSq)
-    cosSq = np.sum(3*np.power(cosSq,2)) - sub
-    sinSq = np.sum(3*np.power(sinSq,2)) - sub
-
-    Qab[0,0] = cosSq
-    Qab[0,1] = cosSin
-    Qab[1,0] = cosSin
-    Qab[1,1] = sinSq
-    Qab[2,2] = -sub
-
-    Qab = Qab/(2*sub)
+    #
+    # Generate a 3D unit vector for each cell (i,j) and
+    # put it in a (3,i,j) array.
+    #
+    lab = np.vstack((np.cos(arr),np.sin(arr),np.zeros_like(arr))).reshape(3,nmax,nmax)
+    for a in range(3):
+        for b in range(3):
+            for i in range(nmax):
+                for j in range(nmax):
+                    Qab[a,b] += 3*lab[a,i,j]*lab[b,i,j] - delta[a,b]
+    Qab = Qab/(2*nmax*nmax)
     eigenvalues,eigenvectors = np.linalg.eig(Qab)
-    
     return eigenvalues.max()
 #=======================================================================
 def MC_step(arr,Ts,nmax):
@@ -272,34 +225,35 @@ def MC_step(arr,Ts,nmax):
 	Returns:
 	  accept/(nmax**2) (float) = acceptance ratio for current MCS.
     """
-    scale = 0.1+Ts
+    #
+    # Pre-compute some random numbers.  This is faster than
+    # using lots of individual calls.  "scale" sets the width
+    # of the distribution for the angle changes - increases
+    # with temperature.
+    scale=0.1+Ts
     accept = 0
-
-    xRan = np.random.randint(0,nmax,size=(nmax,nmax)).flatten()
-    yRan = np.random.randint(0,nmax,size=(nmax,nmax)).flatten()
-    delAng = np.random.normal(scale=scale, size=(nmax,nmax)).flatten()
-
-    flatArr = arr.flatten()
-    
-    #This methid unfortunately is very similar to the original to maintain full randomization but should be quicker by reducing a nested loop and organising data in a contiguous array for faster access
-
-    for i in range(nmax*nmax):
-        ix = xRan[i]
-        iy = yRan[i]
-        ang = delAng[i]
-
-        en0 = one_energy(arr,ix,iy,nmax)
-        arr[ix,iy] += ang
-        en1 = one_energy(arr,ix,iy,nmax)
-
-        if en1<=en0:
-            accept += 1
-        else:
-            boltz = np.exp(-(en1-en0)/Ts)
-            if boltz >= np.random.uniform(0.0,1.0):
+    xran = np.random.randint(0,high=nmax, size=(nmax,nmax))
+    yran = np.random.randint(0,high=nmax, size=(nmax,nmax))
+    aran = np.random.normal(scale=scale, size=(nmax,nmax))
+    for i in range(nmax):
+        for j in range(nmax):
+            ix = xran[i,j]
+            iy = yran[i,j]
+            ang = aran[i,j]
+            en0 = one_energy(arr,ix,iy,nmax)
+            arr[ix,iy] += ang
+            en1 = one_energy(arr,ix,iy,nmax)
+            if en1<=en0:
                 accept += 1
             else:
-                arr[ix,iy] -= ang
+            # Now apply the Monte Carlo test - compare
+            # exp( -(E_new - E_old) / T* ) >= rand(0,1)
+                boltz = np.exp( -(en1 - en0) / Ts )
+
+                if boltz >= np.random.uniform(0.0,1.0):
+                    accept += 1
+                else:
+                    arr[ix,iy] -= ang
     return accept/(nmax*nmax)
 #=======================================================================
 def main(program, nsteps, nmax, temp, pflag):
@@ -318,16 +272,15 @@ def main(program, nsteps, nmax, temp, pflag):
     figN = int(0)
     # Create and initialise lattice
     lattice = initdat(nmax)
-    eSum = all_energy(lattice)
     # Plot initial frame of lattice
-    plotdat(lattice,pflag,nmax,figN)
-    figN += 1
+    #plotdat(lattice,pflag,nmax,figN)
+    #figN += 1
     # Create arrays to store energy, acceptance ratio and order parameter
     energy = np.zeros(nsteps+1,dtype=np.dtype)
     ratio = np.zeros(nsteps+1,dtype=np.dtype)
     order = np.zeros(nsteps+1,dtype=np.dtype)
     # Set initial values in arrays
-    energy[0] = eSum
+    energy[0] = all_energy(lattice,nmax)
     ratio[0] = 0.5 # ideal value
     order[0] = get_order(lattice,nmax)
 
@@ -335,7 +288,7 @@ def main(program, nsteps, nmax, temp, pflag):
     initial = time.time()
     for it in range(1,nsteps+1):
         ratio[it] = MC_step(lattice,temp,nmax)
-        energy[it] = all_energy(lattice)
+        energy[it] = all_energy(lattice,nmax)
         order[it] = get_order(lattice,nmax)
     final = time.time()
     runtime = final-initial
@@ -346,19 +299,5 @@ def main(program, nsteps, nmax, temp, pflag):
     #savedat(lattice,nsteps,temp,runtime,ratio,energy,order,nmax)
     #plotdat(lattice,pflag,nmax,figN)
 
+#=======================================================================
 
-#=======================================================================
-# Main part of program, getting command line arguments and calling
-# main simulation function.
-#
-if __name__ == '__main__':
-    if int(len(sys.argv)) == 5:
-        PROGNAME = sys.argv[0]
-        ITERATIONS = int(sys.argv[1])
-        SIZE = int(sys.argv[2])
-        TEMPERATURE = float(sys.argv[3])
-        PLOTFLAG = int(sys.argv[4])
-        main(PROGNAME, ITERATIONS, SIZE, TEMPERATURE, PLOTFLAG)
-    else:
-        print("Usage: python {} <ITERATIONS> <SIZE> <TEMPERATURE> <PLOTFLAG>".format(sys.argv[0]))
-#=======================================================================
