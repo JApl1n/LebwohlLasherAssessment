@@ -23,7 +23,7 @@ SH 16-Oct-23
 """
 
 import sys
-from numba import jit ,prange
+from numba import jit ,prange, njit
 import time
 import datetime
 import numpy as np
@@ -132,6 +132,7 @@ def savedat(arr,nsteps,Ts,runtime,ratio,energy,order,nmax):
         print("   {:05d}    {:6.4f} {:12.4f}  {:6.4f} ".format(i,ratio[i],energy[i],order[i]),file=FileOut)
     FileOut.close()
 #=======================================================================
+@njit
 def one_energy(arr,ix,iy,nmax):
     """
     Arguments:
@@ -211,6 +212,7 @@ def get_order(arr,nmax):
     eigenvalues,eigenvectors = np.linalg.eig(Qab)
     return eigenvalues.max()
 #=======================================================================
+@njit
 def MC_step(arr,Ts,nmax):
     """
     Arguments:
@@ -234,9 +236,17 @@ def MC_step(arr,Ts,nmax):
     # with temperature.
     scale=0.1+Ts
     accept = 0
-    xran = np.random.randint(0,high=nmax, size=(nmax,nmax))
-    yran = np.random.randint(0,high=nmax, size=(nmax,nmax))
-    aran = np.random.normal(scale=scale, size=(nmax,nmax))
+    
+    xran = np.empty((nmax,nmax), dtype=np.int32)
+    yran = np.empty((nmax,nmax), dtype=np.int32)
+    aran = np.empty((nmax,nmax), dtype=np.float64)
+    
+    for i in range(nmax):
+        for j in range(nmax):
+            xran[i,j] = np.random.randint(0, nmax)
+            yran[i,j] = np.random.randint(0, nmax)
+            aran[i,j] = np.random.normal(0, scale)
+
     for i in range(nmax):
         for j in range(nmax):
             ix = xran[i,j]

@@ -17,7 +17,7 @@ for file in os.listdir():
         if file.startswith("slurm"):
             f = open(f"{path}/{file}", "r")
             split = f.read().split()
-            #print(split)
+            print(split)
             times = np.append(times, float(split[10]))
 
 progName = str(split[0][11:-1])
