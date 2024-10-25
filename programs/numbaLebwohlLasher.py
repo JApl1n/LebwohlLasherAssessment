@@ -167,6 +167,7 @@ def one_energy(arr,ix,iy,nmax):
     en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
     return en
 #=======================================================================
+@njit
 def all_energy(arr,nmax):
     """
     Arguments:
@@ -184,6 +185,7 @@ def all_energy(arr,nmax):
             enall += one_energy(arr,i,j,nmax)
     return enall
 #=======================================================================
+@njit
 def get_order(arr,nmax):
     """
     Arguments:
@@ -196,19 +198,26 @@ def get_order(arr,nmax):
 	Returns:
 	  max(eigenvalues(Qab)) (float) = order parameter for lattice.
     """
-    Qab = np.zeros((3,3))
-    delta = np.eye(3,3)
+    Qab = np.zeros((3,3), dtype=np.float64)
+    delta = np.eye(3,3, dtype=np.float64)
     #
     # Generate a 3D unit vector for each cell (i,j) and
     # put it in a (3,i,j) array.
     #
-    lab = np.vstack((np.cos(arr),np.sin(arr),np.zeros_like(arr))).reshape(3,nmax,nmax)
+    lab = np.empty((3,nmax,nmax), dtype=np.float64)
+    for i in range(nmax):
+        for j in range(nmax):
+            lab[0,i,j] = np.cos(arr[i,j])
+            lab[1,i,j] = np.sin(arr[i,j])
+            lab[2,i,j] = 0.0
+
     for a in range(3):
         for b in range(3):
             for i in range(nmax):
                 for j in range(nmax):
-                    Qab[a,b] += 3*lab[a,i,j]*lab[b,i,j] - delta[a,b]
+                    Qab[a,b] = Qab[a,b] + 3*lab[a,i,j]*lab[b,i,j] - delta[a,b]
     Qab = Qab/(2*nmax*nmax)
+
     eigenvalues,eigenvectors = np.linalg.eig(Qab)
     return eigenvalues.max()
 #=======================================================================

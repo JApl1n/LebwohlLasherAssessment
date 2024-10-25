@@ -1,0 +1,1 @@
+./programs/numbaLebwohlLasher.py: Size: 25, Steps: 500, T*: 1.000: Order: 0.540, Time: 0.933053 s
