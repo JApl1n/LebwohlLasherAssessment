@@ -10,7 +10,7 @@ do
 done
 
 # allow time for all to come through
-sleep 1 
+sleep 5 
 
 mv *.out outputs
 cd outputs

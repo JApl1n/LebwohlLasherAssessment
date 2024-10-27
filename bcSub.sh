@@ -23,8 +23,8 @@ cd "${SLURM_SUBMIT_DIR}"
 #printf "\n\n"
 
 # Submit
-#python ./programs/numpyLebwohlLasher.py 500 25 1 1
-python ./programs/cythonRunner.py 500 25 1 0
+python ./programs/numpyLebwohlLasher.py 500 25 1 0
+#python ./programs/cythonRunner.py 500 50 1 0
 
 # Output the end time
 #printf "\n\n"

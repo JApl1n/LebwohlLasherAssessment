@@ -1,1 +1,0 @@
-./programs/mpiLebwohlLasher.py: Size: 50, Steps: 100, T*: 1.000: Order: 0.266, Time: 7.098102 s

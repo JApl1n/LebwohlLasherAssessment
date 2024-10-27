@@ -238,7 +238,8 @@ def get_order(arr,nmax):
     delta = np.eye(3,3)
 
     sub = (nmax*nmax)
-
+    # This is a very simplified version of the original loop that removes some instructions and calculations,
+    # but results in the same output.
     cosSq = np.cos(arr)
     sinSq = np.sin(arr)
     cosSin = np.sum(3*sinSq*cosSq)
@@ -281,7 +282,7 @@ def MC_step(arr,Ts,nmax):
 
     flatArr = arr.flatten()
     
-    #This methid unfortunately is very similar to the original to maintain full randomization but should be quicker by reducing a nested loop and organising data in a contiguous array for faster access
+    # This method unfortunately is very similar to the original to maintain full randomization but should be quicker by reducing a nested loop and organising data in a contiguous array for faster access
 
     for i in range(nmax*nmax):
         ix = xRan[i]

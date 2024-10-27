@@ -204,6 +204,7 @@ def get_order(arr,nmax):
     # Generate a 3D unit vector for each cell (i,j) and
     # put it in a (3,i,j) array.
     #
+    # the original defintion for this array uses a function that doesnt work well with numba
     lab = np.empty((3,nmax,nmax), dtype=np.float64)
     for i in range(nmax):
         for j in range(nmax):
@@ -249,7 +250,7 @@ def MC_step(arr,Ts,nmax):
     xran = np.empty((nmax,nmax), dtype=np.int32)
     yran = np.empty((nmax,nmax), dtype=np.int32)
     aran = np.empty((nmax,nmax), dtype=np.float64)
-    
+    # similar to before we have to replace a numpy array decleration because its not supported by numba 
     for i in range(nmax):
         for j in range(nmax):
             xran[i,j] = np.random.randint(0, nmax)
