@@ -1,0 +1,2 @@
+Average time taken for cythonRunner.py to complete 500 steps on a grid of size 25x25 for 10 iterations was 8.746158300000001 seconds. 
+Average time taken for mpiLebwohlLasher.py to complete 100 steps on a grid of size 50x50 for 10 iterations was 7.0065056 seconds. 
