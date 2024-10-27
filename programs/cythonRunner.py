@@ -2,7 +2,8 @@
 # Main part of program, getting command line arguments and calling
 # main simulation function.
 #
-from cythonLebwohlLasher import main, all_energy, get_order, MC_step
+#from cythonLebwohlLasher import main, all_energy, get_order, MC_step
+from cythonLebwohlLasher import main
 import sys
 import time
 import datetime
