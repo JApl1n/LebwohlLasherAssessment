@@ -131,7 +131,7 @@ def savedat(arr,nsteps,Ts,runtime,ratio,energy,order,nmax):
         print("   {:05d}    {:6.4f} {:12.4f}  {:6.4f} ".format(i,ratio[i],energy[i],order[i]),file=FileOut)
     FileOut.close()
 #=======================================================================
-def one_energy(arr,ix,iy,nmax):
+def one_energy(arr,ix,iy,nmax,leftColumn,rightColumn):
     """
     Arguments:
 	  arr (float(nmax,nmax)) = array that contains lattice data;
@@ -155,13 +155,24 @@ def one_energy(arr,ix,iy,nmax):
 # Add together the 4 neighbour contributions
 # to the energy
 #
-    ang = arr[ix,iy]-arr[ixp,iy]
+    mid = arr[ix,iy]
+
+    if (ix==arr.shape[0]-1): #if in final column of chunk use extra column given to it
+        ang = mid-rightColumn[iy] 
+    else: 
+        ang = mid-arr[ixp,iy]
+
     en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
-    ang = arr[ix,iy]-arr[ixm,iy]
+    
+    if (ix==0): #If in first column of chunk use left column given to it
+        ang = mid-leftColumn[iy]
+    else:
+        ang = mid-arr[ixm,iy]
+
     en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
-    ang = arr[ix,iy]-arr[ix,iyp]
+    ang = mid-arr[ix,iyp]
     en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
-    ang = arr[ix,iy]-arr[ix,iym]
+    ang = mid-arr[ix,iym]
     en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
     return en
 #=======================================================================
@@ -181,17 +192,28 @@ def all_energy(arr,nmax):
     rank = comm.Get_rank()
     size = comm.Get_size()
 
-    numRows = nmax//size
-    startRow = rank*numRows
+    numCols = nmax//size
+    startCol = rank*numCols
     if rank != (size-1):
-        endRow = (rank+1)*numRows
+        endCol = (rank+1)*numCols
     else:
-        endRow = nmax
+        endCol = nmax
+
+    if rank == 0:
+        leftColumn = arr[:,-1].copy() #column to left of beginning is last column due to boundary conditions
+        rightColumn = arr[:,endCol+1].copy()
+    elif rank == size-1:
+        rightColumn = arr[:,0].copy() #column to right of final chunk is first column
+        leftColumn = arr[:,startCol-1].copy()
+    else:
+        leftColumn = arr[:,startCol-1].copy() #send neighbour columns for one_energy
+        rightColumn = arr[:,endCol+1].copy()
+
 
     enLocal = 0.0
-    for i in range(startRow, endRow):
+    for i in range(startCol, endCol):
         for j in range(nmax):
-            enLocal += one_energy(arr,i,j,nmax)
+            enLocal += one_energy(arr,i,j,nmax,leftColumn,rightColumn)
     enAll = comm.reduce(enLocal, op=MPI.SUM, root=0)
     
     if rank == 0:
@@ -215,12 +237,12 @@ def get_order(arr,nmax):
     rank = comm.Get_rank()
     size = comm.Get_size()
 
-    numRows = nmax//size
-    startRow = rank*numRows
+    numCols = nmax//size
+    startCol = rank*numCols
     if rank != (size-1):
-        endRow = (rank+1)*numRows
+        endCol = (rank+1)*numCols
     else:
-        endRow = nmax
+        endCol = nmax
 
     QabLocal = np.zeros((3,3))
     delta = np.eye(3,3)
@@ -232,7 +254,7 @@ def get_order(arr,nmax):
             )
     for a in range(3):
         for b in range(3):
-            for i in range(startRow, endRow):
+            for i in range(startCol, endCol):
                 for j in range(nmax):
                     QabLocal[a,b] += 3*lab[a,i,j]*lab[b,i,j] - delta[a,b]
     
@@ -281,22 +303,34 @@ def MC_step(arr,Ts,nmax):
     leftNeighbour = (rank-1)%size
     rightNeighbour = (rank+1)%size
 
-    localArr = arr[:, startCol:endCol].copy()
+    localArr = arr[startCol:endCol,:].copy()
+     
+    if rank == 0:
+        leftColumn = arr[-1,:].copy() #column to left of beginning is last column due to boundary conditions
+        rightColumn = arr[endCol+1,:].copy() 
+    elif rank == size-1:
+        rightColumn = arr[0,:].copy() #column to right of final chunk is first column
+        leftColumn = arr[startCol-1,:].copy()
+    else:
+        leftColumn = arr[startCol-1,:].copy() #send neighbour columns for one_energy
+        rightColumn = arr[endCol+1,:].copy()
+    
+    
     scale = 0.1 + Ts
-    xran = np.random.randint(0, high=localArr.shape[1], size=(nmax, localArr.shape[1]))
-    aran = np.random.normal(scale=scale, size=(nmax, localArr.shape[1]))
+    xran = np.random.randint(0, high=localArr.shape[0], size=(localArr.shape[0],nmax))
+    aran = np.random.normal(scale=scale, size=(localArr.shape[0],nmax))
   
     # im defining this function here so it has access to data within MC_Step
     def update_positions(offset):
         accept=0
-        for i in range(nmax):
-            for j in range(offset, localArr.shape[1], 2):
+        for i in range(offset,localArr.shape[0], 2):
+            for j in range(nmax):
                 ix = xran[i,j]
                 ang = aran[i,j]
 
-                en0 = one_energy(localArr,ix,j,nmax)
+                en0 = one_energy(localArr,ix,j,nmax,leftColumn,rightColumn)
                 localArr[ix,j] += ang
-                en1 = one_energy(localArr,ix,j,nmax)
+                en1 = one_energy(localArr,ix,j,nmax,leftColumn,rightColumn)
 
                 if en1 <= en0 or np.exp(-(en1-en0)/Ts) >= np.random.uniform(0,1):
                     accept += 1
@@ -320,8 +354,8 @@ def MC_step(arr,Ts,nmax):
 def sync_boundaries(localArr, leftNeighbour, rightNeighbour, comm, nmax):
 
     # create contiguous buffers for sending and receiving boundary columns
-    leftColSend = np.ascontiguousarray(localArr[:, 0])
-    rightColSend = np.ascontiguousarray(localArr[:, -1])
+    leftColSend = np.ascontiguousarray(localArr[0,:])
+    rightColSend = np.ascontiguousarray(localArr[-1,:])
     leftColRecv = np.empty(nmax, dtype=localArr.dtype)
     rightColRecv = np.empty(nmax, dtype=localArr.dtype)
 
@@ -333,8 +367,8 @@ def sync_boundaries(localArr, leftNeighbour, rightNeighbour, comm, nmax):
     comm.Sendrecv(sendbuf=leftColSend, dest=leftNeighbour, sendtag=0,
                   recvbuf=rightColRecv, source=rightNeighbour, recvtag=0)
 
-    localArr[:, 0] = leftColRecv
-    localArr[:, -1] = rightColRecv
+    localArr[0,:] = leftColRecv
+    localArr[-1,:] = rightColRecv
 
 #=======================================================================
 def main(program, nsteps, nmax, temp, pflag):
@@ -375,10 +409,14 @@ def main(program, nsteps, nmax, temp, pflag):
     runtime = final-initial
     
     # Final outputs
-    print("{}: Size: {:d}, Steps: {:d}, T*: {:5.3f}: Order: {:5.3f}, Time: {:8.6f} s".format(program, nmax,nsteps,temp,order[nsteps-1],runtime))
-    # Plot final frame of lattice and generate output file
-    #savedat(lattice,nsteps,temp,runtime,ratio,energy,order,nmax)
-    #plotdat(lattice,pflag,nmax,figN)
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+
+    if rank==0:
+        print("{}: Size: {:d}, Steps: {:d}, T*: {:5.3f}: Order: {:5.3f}, Time: {:8.6f} s".format(program, nmax,nsteps,temp,order[nsteps-1],runtime))
+        # Plot final frame of lattice and generate output file
+        savedat(lattice,nsteps,temp,runtime,ratio,energy,order,nmax)
+        #plotdat(lattice,pflag,nmax,figN)
 
 
 #=======================================================================

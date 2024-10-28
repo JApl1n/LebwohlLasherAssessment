@@ -6,6 +6,30 @@ testFig1Init and 2 and 3 are the results of running the input values 1000 20 1 a
 
 testFig1Fin and 2 and 3 show the final time shot of the output after as shown in the command line 1000 time steps. 
 
+Within 'programs' is all the programs required to run the different methods, each name linking to a module used to alter the original only using that module. This allows for a direct comparison of each method.
 
+-------
 
+original, numpy and numba all are executed as follows:
 
+python filename.py I N T flag
+
+where I is the number of time steps to run through, N the length of one of the sides of the square grid, T the initial temperature and flag the flag number for graphing, leave as 0 for no graph output.
+
+For running the cython version, it is already compiled with the cythonSetup file, then run using:
+
+python cythonRunner.py I N T flag
+
+And lastly for the MPI method use:
+
+mpiexec -n 4 python mpiLebwohlLasher.py I N T flag
+
+where you can replace 4 with the number of nodes you'd like to use.
+
+-------
+
+timer.py can be used while in the programs directory to average times taken of any outputs in the outputs folder. This means if you want to only time the last batch of outputs you must remove any other output times before generating the batch for timing. This is usually alright as the individual outputs dont have much information anyway.
+
+To automatiocally do all of this jobSub.sh will use the bcSub.sh file to run the desired file in bcSub.sh a desired amount of times and with a desired amount of nodes as chosen there, then collate the resulting times for processing by the timer automatically to get an average run time.
+
+-------

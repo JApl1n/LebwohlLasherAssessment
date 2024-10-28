@@ -335,3 +335,4 @@ def main(str program,int nsteps,int nmax,double temp,int pflag):
 
     # Final outputs
     print("{}: Size: {:d}, Steps: {:d}, T*: {:5.3f}: Order: {:5.3f}, Time: {:8.6f} s".format(program, nmax,nsteps,temp,order[nsteps-1],runtime))
+    savedat(lattice,nsteps,temp,runtime,ratio,energy,order,nmax)

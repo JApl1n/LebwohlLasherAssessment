@@ -1,1 +1,0 @@
-Average time taken for originalLebwohlLasher.py to complete 500 steps on a grid of size 50x50 for 10 iterations was 37.1252655 seconds.
