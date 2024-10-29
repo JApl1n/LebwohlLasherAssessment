@@ -5,7 +5,7 @@
 #SBATCH --partition=teach_cpu
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=2
+#SBATCH --cpus-per-task=1
 #SBATCH --time=0:0:10
 #SBATCH --mem-per-cpu=100M 
 #SBATCH --array=100-109
@@ -23,9 +23,9 @@ cd "${SLURM_SUBMIT_DIR}"
 #printf "\n\n"
 
 # Submit
-#python ./programs/numpyLebwohlLasher.py 100 90 1 0
+python ./programs/numbaLebwohlLasher.py 100 50 1 0
 #python ./programs/cythonRunner.py 100 25 1 0
-mpiexec -n 2 python ./programs/mpiLebwohlLasher.py 50 20 1 0
+#mpiexec -n 8 python ./programs/mpiLebwohlLasher.py 100 50 1 0
 
 # Output the end time
 #printf "\n\n"

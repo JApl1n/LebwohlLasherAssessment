@@ -353,7 +353,7 @@ def main(program, nsteps, nmax, temp, pflag):
     Returns:
       NULL
     """
-    np.random.seed(1)
+    #np.random.seed(1)
 
     figN = int(0)
     # Create and initialise lattice
@@ -409,7 +409,7 @@ def main(program, nsteps, nmax, temp, pflag):
     if rank==0:
         print("{}: Size: {:d}, Steps: {:d}, T*: {:5.3f}: Order: {:5.3f}, Time: {:8.6f} s, Nodes: {:d}".format(program, nmax,nsteps,temp,order[nsteps-1],runtime,size))
         # Plot final frame of lattice and generate output file
-        savedat(lattice,nsteps,temp,runtime,ratio,energy,order,nmax)
+        #savedat(lattice,nsteps,temp,runtime,ratio,energy,order,nmax)
         #plotdat(lattice,pflag,nmax,figN)
 
 

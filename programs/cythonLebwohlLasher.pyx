@@ -305,7 +305,7 @@ def main(str program,int nsteps,int nmax,double temp,int pflag):
     Returns:
       NULL
     """
-    np.random.seed(0)
+    #np.random.seed(0)
     
     cdef int figN = 0
     cdef double runtime

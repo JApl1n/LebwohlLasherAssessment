@@ -45,4 +45,5 @@ for fileName in fileNames:
         plt.title(str(yAxis) + " over time for simulation with N="+str(fileName[-6:-4])+" and T*=1.0") # chnage title here
         # plt.title(str(yAxis) + " over time for simulation")
 
-        # plt.savefig("energies60.png")
+        
+plt.savefig("order60.png")

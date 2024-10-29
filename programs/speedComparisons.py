@@ -11,7 +11,12 @@ df = pd.read_csv(fileName, delimiter=" ",header=0)
 
 names = df["4"]
 steps = np.array(df["7"].astype("int64"))
-length = np.array(df["14"].str[:2].astype("int64"))
+
+length = np.array(df["14"].str[:3])
+for i in range(len(length)):
+    l = length[i]
+    length[i] = int(l.split("x")[0])
+
 time = np.array(df["19"].astype('float64'))
 
 # Because the order of some of the tests is out of order I have manually selected regions
@@ -60,6 +65,7 @@ mCol2 = "lightgrey"
 mCol4 = "grey"
 mCol8 = "black" 
 
+# Plot different methods for grid size variation
 plt.scatter(xOriginalLength[:11], yOriginalLength[:11], marker=".", color=oCol, label = "Original")
 plt.scatter(xNumpyLength, yNumpyLength, marker=".", color=npCol, label = "Numpy")
 plt.scatter(xNumbaLength, yNumbaLength, marker=".", color=nbCol, label = "Numba")
@@ -67,6 +73,7 @@ plt.scatter(xCythonLength, yCythonLength, marker=".", color=cCol, label = "Cytho
 plt.scatter(xMpiLength2, yMpiLength2, marker=".", color=mCol2, label = "MPI (2 nodes)")
 plt.scatter(xMpiLength4, yMpiLength4, marker=".", color=mCol4, label = "MPI (4 nodes)")
 plt.scatter(xMpiLength8, yMpiLength8, marker=".", color=mCol8, label = "MPI (8 nodes)")
+
 
 plt.xlabel("Grid length")
 plt.ylabel("Average run time (s)")
@@ -78,6 +85,7 @@ plt.savefig("gridSizeEffect.png")
 plt.close()
 
 
+# Plot different methods for num iterations variations
 plt.scatter(xOriginalIterations, yOriginalIterations, marker=".", color=oCol, label = "Original")
 plt.scatter(xNumpyIterations, yNumpyIterations, marker=".", color=npCol, label = "Numpy")
 plt.scatter(xNumbaIterations, yNumbaIterations, marker=".", color=nbCol, label = "Numba")
@@ -86,9 +94,56 @@ plt.scatter(xMpiIterations2, yMpiIterations2, marker=".", color=mCol2, label = "
 plt.scatter(xMpiIterations4, yMpiIterations4, marker=".", color=mCol4, label = "MPI (4 nodes)")
 plt.scatter(xMpiIterations8, yMpiIterations8, marker=".", color=mCol8, label = "MPI (8 nodes)")
 
+# plt.plot(x, y, 'o', t, fit(t), '-')
 plt.xlabel("Grid length")
 plt.ylabel("Average run time (s)")
 plt.grid()
 plt.legend()
 plt.title("Effect of number of iterations on average run time for each method for grid length 25")
+plt.show()
 plt.savefig("iterationsSizeEffect.png")
+plt.close()
+
+# Now below compare numba method to 8 nodes MPI
+
+xMpiBigger = length[109:114]
+yMpiBigger = time[109:114]
+xNumbaBigger = length[114:119]
+yNumbaBigger = time[114:119]
+
+def curveVals(x,y):
+
+    a_guess = 1
+    b_guess = 0.1
+    c_guess = 1
+    
+    # Fit the function a * np.exp(b * t) + c to x and y
+    popt, pcov = curve_fit(
+        lambda t, a, b, c: a * np.exp(b * t) + c,
+        x, y, p0=(a_guess, b_guess, c_guess)
+    )
+    
+    # The optimised values of the parameters are
+    return popt
+
+# Get curve_fit then plot with scatter of actual speeds for grid sizes for both methods
+[a,b,c] = curveVals(xMpiBigger, yMpiBigger)
+x_fitted = np.linspace(np.min(xMpiBigger), np.max(xMpiBigger), 100)
+y_fitted = a * np.exp(b * x_fitted) + c
+
+plt.scatter(xMpiBigger, yMpiBigger, marker=".", color="blue", label = "MPI (8 nodes)")
+plt.plot(x_fitted, y_fitted, '-', label=(f"Ae^(Bx)+c where A={round(a,2)}, B={round(b,4)}, c={round(c,2)}"))
+
+[a,b,c] = curveVals(xNumbaBigger, yNumbaBigger)
+x_fitted = np.linspace(np.min(xNumbaBigger), np.max(xNumbaBigger), 100)
+y_fitted = a * np.exp(b * x_fitted) + c
+
+plt.scatter(xNumbaBigger, yNumbaBigger, marker=".", color="red", label = "Numba")
+plt.plot(x_fitted, y_fitted, '-', label=(f"Ae^(Bx)+c where A={round(a,2)}, B={round(b,4)}, c={round(c,2)}"))
+
+plt.xlabel("Grid length")
+plt.ylabel("Average run time (s)")
+plt.grid()
+plt.legend()
+plt.title("Effect of grid size on average run time MPI vs. Numba")
+plt.savefig("mpiVsNumba.png")
