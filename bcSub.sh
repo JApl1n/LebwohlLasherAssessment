@@ -25,7 +25,7 @@ cd "${SLURM_SUBMIT_DIR}"
 # Submit
 #python ./programs/numpyLebwohlLasher.py 100 90 1 0
 #python ./programs/cythonRunner.py 100 25 1 0
-mpiexec -n 2 python ./programs/mpiLebwohlLasher.py 500 25 1 0
+mpiexec -n 2 python ./programs/mpiLebwohlLasher.py 50 20 1 0
 
 # Output the end time
 #printf "\n\n"

@@ -36,4 +36,6 @@ timer.py can be used while in the programs directory to average times taken of a
 
 To automatiocally do all of this jobSub.sh will use the bcSub.sh file to run the desired file in bcSub.sh a desired amount of times and with a desired amount of nodes as chosen there, then collate the resulting times for processing by the timer automatically to get an average run time.
 
+Once you have a collection of time for various inputs in summary.txt, you can go to the programs folder and output a graphed version of this using speedComparison.py with 'python speedComparison'. I have manual selections in there from the data I collected and you would have to manually select indices for your own which may be easier to just empty summary.txt. I will also not I added a string of numbers spaced by spaces to use to access the columns for the dataframe so they would also need to be added to the top.
+
 -------
