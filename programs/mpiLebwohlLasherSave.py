@@ -131,15 +131,13 @@ def savedat(arr,nsteps,Ts,runtime,ratio,energy,order,nmax):
         print("   {:05d}    {:6.4f} {:12.4f}  {:6.4f} ".format(i,ratio[i],energy[i],order[i]),file=FileOut)
     FileOut.close()
 #=======================================================================
-def one_energy(localArr,ix,iy,nmax,leftColumn,rightColumn):
+def one_energy(arr,ix,iy,nmax,leftColumn,rightColumn):
     """
     Arguments:
 	  arr (float(nmax,nmax)) = array that contains lattice data;
 	  ix (int) = x lattice coordinate of cell;
 	  iy (int) = y lattice coordinate of cell;
-          nmax (int) = side length of square lattice;
-          leftColumn (float(nmax)) = array containing column to left of localArray;
-          rightColumn (float(nmax)) = array containing column to right of localArray.
+      nmax (int) = side length of square lattice.
     Description:
       Function that computes the energy of a single cell of the
       lattice taking into account periodic boundaries.  Working with
@@ -149,56 +147,73 @@ def one_energy(localArr,ix,iy,nmax,leftColumn,rightColumn):
 	  en (float) = reduced energy of cell.
     """
     en = 0.0
-    ixp = (ix+1) # These are the coordinates
-    ixm = (ix-1) # of the neighbours
-    iyp = (iy+1)%nmax
-    iym = (iy-1)
+    ixp = (ix+1)%nmax # These are the coordinates
+    ixm = (ix-1)%nmax # of the neighbours
+    iyp = (iy+1)%nmax # with wraparound
+    iym = (iy-1)%nmax #
 #
 # Add together the 4 neighbour contributions
 # to the energy
 #
-    mid = localArr[ix,iy]
-    width = localArr.shape[0]
+    mid = arr[ix,iy]
 
-    if (ix==width-1): #if in final column of chunk use extra column given to it
+    if (ix==arr.shape[0]-1): #if in final column of chunk use extra column given to it
         ang = mid-rightColumn[iy] 
     else: 
-        ang = mid-localArr[ixp,iy]
+        ang = mid-arr[ixp,iy]
 
     en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
     
     if (ix==0): #If in first column of chunk use left column given to it
         ang = mid-leftColumn[iy]
     else:
-        ang = mid-localArr[ixm,iy]
+        ang = mid-arr[ixm,iy]
 
     en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
-    ang = mid-localArr[ix,iyp]
+    ang = mid-arr[ix,iyp]
     en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
-    ang = mid-localArr[ix,iym]
+    ang = mid-arr[ix,iym]
     en += 0.5*(1.0 - 3.0*np.cos(ang)**2)
     return en
 #=======================================================================
-def all_energy(localArr,nmax,comm,rank,leftColumn,rightColumn):
+def all_energy(arr,nmax):
     """
     Arguments:
-	  localArr (float(endCol-startCol,nmax)) = array that contains lattice data;
-          nmax (int) = side length of square lattice;
-          comm = method for mpi communication;
-          rank (int) = rank of current node in comm world;
-          leftColumn (float(nmax)) = array containing column to left of localArray;
-          rightColumn (float(nmax)) = array containing column to right of localArray.
+	  arr (float(nmax,nmax)) = array that contains lattice data;
+      nmax (int) = side length of square lattice.
     Description:
       Function to compute the energy of the entire lattice. Output
       is in reduced units (U/epsilon).
 	Returns:
 	  enall (float) = reduced energy of lattice.
     """
-    # Very similar solution to original just need to add each section's energies together 
+    
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+
+    numCols = nmax//size
+    startCol = rank*numCols
+    if rank != (size-1):
+        endCol = (rank+1)*numCols
+    else:
+        endCol = nmax
+
+    if rank == 0:
+        leftColumn = arr[:,-1].copy() #column to left of beginning is last column due to boundary conditions
+        rightColumn = arr[:,endCol+1].copy()
+    elif rank == size-1:
+        rightColumn = arr[:,0].copy() #column to right of final chunk is first column
+        leftColumn = arr[:,startCol-1].copy()
+    else:
+        leftColumn = arr[:,startCol-1].copy() #send neighbour columns for one_energy
+        rightColumn = arr[:,endCol+1].copy()
+
+
     enLocal = 0.0
-    for i in range(0,localArr.shape[0]):
+    for i in range(startCol, endCol):
         for j in range(nmax):
-            enLocal += one_energy(localArr,i,j,nmax,leftColumn,rightColumn)
+            enLocal += one_energy(arr,i,j,nmax,leftColumn,rightColumn)
     enAll = comm.reduce(enLocal, op=MPI.SUM, root=0)
     
     if rank == 0:
@@ -206,13 +221,11 @@ def all_energy(localArr,nmax,comm,rank,leftColumn,rightColumn):
     else:
         return None
 #=======================================================================
-def get_order(localArr,nmax,comm,rank):
+def get_order(arr,nmax):
     """
     Arguments:
-	  localArr (float(nmax,nmax)) = array that contains lattice data;
-          nmax (int) = side length of square lattice;
-          comm = method for mpi communication;
-          rank (int) = rank of current node in comm world.
+	  arr (float(nmax,nmax)) = array that contains lattice data;
+      nmax (int) = side length of square lattice.
     Description:
       Function to calculate the order parameter of a lattice
       using the Q tensor approach, as in equation (3) of the
@@ -220,6 +233,16 @@ def get_order(localArr,nmax,comm,rank):
 	Returns:
 	  max(eigenvalues(Qab)) (float) = order parameter for lattice.
     """
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+
+    numCols = nmax//size
+    startCol = rank*numCols
+    if rank != (size-1):
+        endCol = (rank+1)*numCols
+    else:
+        endCol = nmax
 
     QabLocal = np.zeros((3,3))
     delta = np.eye(3,3)
@@ -227,13 +250,11 @@ def get_order(localArr,nmax,comm,rank):
     # Generate a 3D unit vector for each cell (i,j) and
     # put it in a (3,i,j) array.
     #
-
-    #` This method is very friendly with mpi not requiring much change just summing results
-
-    lab = np.vstack((np.cos(localArr),np.sin(localArr),np.zeros_like(localArr))).reshape(3,localArr.shape[0],nmax)
+    lab = np.vstack((np.cos(arr),np.sin(arr),np.zeros_like(arr))).reshape(3,nmax,nmax
+            )
     for a in range(3):
         for b in range(3):
-            for i in range(0,localArr.shape[0]):
+            for i in range(startCol, endCol):
                 for j in range(nmax):
                     QabLocal[a,b] += 3*lab[a,i,j]*lab[b,i,j] - delta[a,b]
     
@@ -246,18 +267,12 @@ def get_order(localArr,nmax,comm,rank):
     else:
         return None
 #=======================================================================
-def MC_step(localArr,Ts,nmax,comm,rank,leftNeighbour,rightNeighbour,leftColumn,rightColumn):
+def MC_step(arr,Ts,nmax):
     """
     Arguments:
-	  localArr (float(endCol-startCol,nmax)) = array that contains lattice data;
+	  arr (float(nmax,nmax)) = array that contains lattice data;
 	  Ts (float) = reduced temperature (range 0 to 2);
-          nmax (int) = side length of square lattice.
-          comm = method for mpi communication;
-          rank (int) = rank of current node in comm world;
-          leftNeighbour (int) = index of left neighbour;
-          rightNeighbour (int) = index of right neighbour;
-          leftColumn (float(nmax)) = array containing column to left of localArray;
-          rightColumn (float(nmax)) = array containing column to right of localArray.
+      nmax (int) = side length of square lattice.
     Description:
       Function to perform one MC step, which consists of an average
       of 1 attempted change per lattice site.  Working with reduced
@@ -273,46 +288,62 @@ def MC_step(localArr,Ts,nmax,comm,rank,leftNeighbour,rightNeighbour,leftColumn,r
     # using lots of individual calls.  "scale" sets the width
     # of the distribution for the angle changes - increases
     # with temperaturie.
+
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+
+    numCols = nmax//size
+    startCol = rank*numCols
+    if rank != (size-1):
+        endCol = (rank+1)*numCols
+    else:
+        endCol = nmax
+
+    leftNeighbour = (rank-1)%size
+    rightNeighbour = (rank+1)%size
+
+    localArr = arr[startCol:endCol,:].copy()
+     
+    if rank == 0:
+        leftColumn = arr[-1,:].copy() #column to left of beginning is last column due to boundary conditions
+        rightColumn = arr[endCol+1,:].copy() 
+    elif rank == size-1:
+        rightColumn = arr[0,:].copy() #column to right of final chunk is first column
+        leftColumn = arr[startCol-1,:].copy()
+    else:
+        leftColumn = arr[startCol-1,:].copy() #send neighbour columns for one_energy
+        rightColumn = arr[endCol+1,:].copy()
+    
     
     scale = 0.1 + Ts
-    width = localArr.shape[0]
-    xran = np.random.randint(0, high=width, size=(width,nmax))
-    yran = np.random.randint(0, high=nmax, size=(width,nmax))
-    aran = np.random.normal(scale=scale, size=(width,nmax))
+    xran = np.random.randint(0, high=localArr.shape[0], size=(localArr.shape[0],nmax))
+    aran = np.random.normal(scale=scale, size=(localArr.shape[0],nmax))
 
     # im defining this function here so it has access to data within MC_Step
-    # we will loop through half the random numbers, calculate if the spot is in correct checkerboard colour
-    # (if not move to space below) then do normal maths. Then update left and right shared columns to neighbours,
-    # then complete for other checkerboard colour. Then sum odd and evenly index spaces on checkerboard accepts.
     def update_positions(offset):
         accept=0
-        for i in range(offset,width,2): 
+        for i in range(offset,localArr.shape[0], 2):
             for j in range(nmax):
                 ix = xran[i,j]
-                iy = yran[i,j]
                 ang = aran[i,j]
-                
-                if (ix+iy)%2 != offset: # If not on correct checkerboard colour move down
-                    iy += 1
-                    if iy==nmax: #If at bottom send to top
-                        iy = 0
 
-                en0 = one_energy(localArr,ix,iy,nmax,leftColumn,rightColumn)
-                localArr[ix,iy] += ang
-                en1 = one_energy(localArr,ix,iy,nmax,leftColumn,rightColumn)
+                en0 = one_energy(localArr,ix,j,nmax,leftColumn,rightColumn)
+                localArr[ix,j] += ang
+                en1 = one_energy(localArr,ix,j,nmax,leftColumn,rightColumn)
 
                 if en1 <= en0 or np.exp(-(en1-en0)/Ts) >= np.random.uniform(0,1):
                     accept += 1
                 else:
-                    localArr[ix,iy] -= ang
+                    localArr[ix,j] -= ang
         return accept
 
     # Look at squares with even index
     acceptEven = update_positions(0)
-    sync_boundaries(localArr, leftNeighbour, rightNeighbour, comm, nmax, leftColumn, rightColumn)
+    sync_boundaries(localArr, leftNeighbour, rightNeighbour, comm, nmax)
     # Look at squares with odd indices
     acceptOdd = update_positions(1)
-    sync_boundaries(localArr, leftNeighbour, rightNeighbour, comm, nmax, leftColumn, rightColumn)
+    sync_boundaries(localArr, leftNeighbour, rightNeighbour, comm, nmax)
 
     totalAccept = comm.reduce(acceptEven + acceptOdd, op=MPI.SUM, root=0)
     if rank == 0:
@@ -320,7 +351,7 @@ def MC_step(localArr,Ts,nmax,comm,rank,leftNeighbour,rightNeighbour,leftColumn,r
     else:
         return None
 #=======================================================================
-def sync_boundaries(localArr, leftNeighbour, rightNeighbour, comm, nmax, leftColumn, rightColumn):
+def sync_boundaries(localArr, leftNeighbour, rightNeighbour, comm, nmax):
 
     # create contiguous buffers for sending and receiving boundary columns
     leftColSend = np.ascontiguousarray(localArr[0,:])
@@ -336,8 +367,8 @@ def sync_boundaries(localArr, leftNeighbour, rightNeighbour, comm, nmax, leftCol
     comm.Sendrecv(sendbuf=leftColSend, dest=leftNeighbour, sendtag=0,
                   recvbuf=rightColRecv, source=rightNeighbour, recvtag=0)
 
-    leftColumn = leftColRecv
-    rightColumn = rightColRecv
+    localArr[0,:] = leftColRecv
+    localArr[-1,:] = rightColRecv
 
 #=======================================================================
 def main(program, nsteps, nmax, temp, pflag):
@@ -356,53 +387,32 @@ def main(program, nsteps, nmax, temp, pflag):
     figN = int(0)
     # Create and initialise lattice
     lattice = initdat(nmax)
+    # Plot initial frame of lattice
+    #plotdat(lattice,pflag,nmax,figN)
+    #figN += 1
     # Create arrays to store energy, acceptance ratio and order parameter
     energy = np.zeros(nsteps+1,dtype=np.dtype)
     ratio = np.zeros(nsteps+1,dtype=np.dtype)
     order = np.zeros(nsteps+1,dtype=np.dtype)
-
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    size = comm.Get_size()
-
-    numCols = nmax//size
-    startCol = rank*numCols
-    if rank != (size-1):
-        endCol = (rank+1)*numCols
-    else:
-        endCol = nmax
-
-    leftNeighbour = (rank-1)%size
-    rightNeighbour = (rank+1)%size
-
-    localArr = lattice[startCol:endCol,:].copy()
-
-    if rank == 0:
-        leftColumn = lattice[-1,:].copy() #column to left of beginning is last column due to boundary conditions
-        rightColumn = lattice[endCol+1,:].copy()
-    elif rank == size-1:
-        rightColumn = lattice[0,:].copy() #column to right of final chunk is first column
-        leftColumn = lattice[startCol-1,:].copy()
-    else:
-        leftColumn = lattice[startCol-1,:].copy() #send neighbour columns for one_energy
-        rightColumn = lattice[endCol+1,:].copy()
-
     # Set initial values in arrays
-    energy[0] = all_energy(localArr,nmax,comm,rank,leftColumn,rightColumn)
+    energy[0] = all_energy(lattice,nmax)
     ratio[0] = 0.5 # ideal value
-    order[0] = get_order(localArr,nmax,comm,rank)
-
+    order[0] = get_order(lattice,nmax)
 
     # Begin doing and timing some MC steps.
     initial = time.time()
     for it in range(1,nsteps+1):
-        ratio[it] = MC_step(localArr,temp,nmax,comm,rank,leftNeighbour,rightNeighbour,leftColumn,rightColumn)
-        energy[it] = all_energy(localArr,nmax,comm,rank,leftColumn,rightColumn)
-        order[it] = get_order(localArr,nmax,comm,rank)
+        ratio[it] = MC_step(lattice,temp,nmax)
+        energy[it] = all_energy(lattice,nmax)
+        print(energy[it])
+        order[it] = get_order(lattice,nmax)
+        print(order[it])
     final = time.time()
     runtime = final-initial
     
     # Final outputs
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
 
     if rank==0:
         print("{}: Size: {:d}, Steps: {:d}, T*: {:5.3f}: Order: {:5.3f}, Time: {:8.6f} s".format(program, nmax,nsteps,temp,order[nsteps-1],runtime))
