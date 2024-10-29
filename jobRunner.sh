@@ -24,7 +24,6 @@ echo "Ignore first warning message. Here are the times of the run, they have als
 # find average time for each iterayion
 cd ../programs
 
-#sleep 2
+sleep 2
 
-#python ./timer.py
-
+python ./timer.py

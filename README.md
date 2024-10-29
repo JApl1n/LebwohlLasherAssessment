@@ -20,7 +20,11 @@ For running the cython version, it is already compiled with the cythonSetup file
 
 python cythonRunner.py I N T flag
 
-And lastly for the MPI method use:
+If you wish to change something in a function in cythonLebwohlLasher.pyx, do so then do:
+
+python setupiCython.py build_ext --inplace
+
+to compile the c file then you can run the cython runner. And lastly for the MPI method use:
 
 mpiexec -n 4 python mpiLebwohlLasher.py I N T flag
 

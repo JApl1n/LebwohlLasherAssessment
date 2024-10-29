@@ -291,6 +291,8 @@ def main(program, nsteps, nmax, temp, pflag):
     Returns:
       NULL
     """
+    np.random.seed(1)
+    
     figN = int(0)
     # Create and initialise lattice
     lattice = initdat(nmax)
